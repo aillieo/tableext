@@ -12,10 +12,11 @@ local floor = math.floor
 local istable = function(t)
     return type(t) == "table"
 end
+
 local isarray = function(t)
     if not istable(t) then return false end
     local len = #t
-    for i,_ in pairs(t) do
+    for i in pairs(t) do
         if type(i) ~= "number" then
             return false
         end
@@ -25,29 +26,34 @@ local isarray = function(t)
     end
     return true
 end
+
 local asserttable = function(t)
     assert(istable(t), "invalid argument: table expected, got " .. type(t))
 end
+
 local assertarray = function(t)
     assert(isarray(t), "invalid argument: not an array-table")
 end
+
 local assertnotnil = function(arg)
     assert(nil ~= arg, "invalid argument: nil")
 end
+
 local isempty = function(t)
     asserttable(t)
     return next(t) == nil end
+
 local size = function(t)
     asserttable(t)
     local ret = 0
-    for _, _ in pairs(t) do
+    for _ in pairs(t) do
         ret = ret + 1
     end
     return ret
 end
 local clear = function(t)
     asserttable(t)
-    for k,_ in pairs(t) do
+    for k in pairs(t) do
         t[k] = nil
     end
 end
@@ -217,23 +223,31 @@ local lock = function(t)
 end
 
 local map = function(t, func)
-    assertarray(t)
+    asserttable(t)
     local ret = {}
-    for i,v in ipairs(t) do
-        ret[i] = func(v)
+    for k,v in pairs(t) do
+        ret[k] = func(v)
     end
     return ret
 end
 
 local filter = function(t, func)
+    asserttable(t)
     local ret = {}
-    for _,v in ipairs(t) do
-        if func(v) then insert(ret,v) end
+    if isarray(t) then
+        for _,v in ipairs(t) do
+            if func(v) then insert(ret,v) end
+        end
+    else
+        for k,v in pairs(t) do
+            if func(v) then ret[k] = v end
+        end
     end
     return ret
 end
 
 local reduce = function(t, func)
+    assertarray(t)
     local ret = t[1]
     local n = #t
     for i = 2, n do
@@ -244,6 +258,7 @@ end
 
 
 local unique = function(t)
+    assertarray(t)
     local ret = {}
     for _,v in ipairs(t) do
         if not find(ret,v) then
@@ -255,6 +270,7 @@ end
 
 
 local flip = function(t)
+    asserttable(t)
     local ret = {}
     for k,v in pairs(t) do
         if not ret[v] then ret[v] = k end
