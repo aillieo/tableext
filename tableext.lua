@@ -32,6 +32,7 @@ local asserttable = function(t)
 end
 
 local assertarray = function(t)
+    asserttable(t);
     assert(isarray(t), "invalid argument: not an array-table")
 end
 
@@ -80,7 +81,6 @@ end
 local find = function(t,v)
     asserttable(t)
     assertnotnil(v)
-    if v == nil then return end
     for k1,v1 in pairs(t) do
         if v1 == v then
             return k1
@@ -191,6 +191,16 @@ local merge = function(tto,tfrom)
     end
 end
 
+
+local append = function(fst, sec)
+    assertarray(fst)
+    assertarray(sec)
+    local l = #fst
+    for i,v in ipairs(sec) do
+        fst[l+i] = v
+    end
+end
+
 local split = function(t)
     asserttable(t)
     local arr, rec = {}, {}
@@ -261,7 +271,7 @@ local unique = function(t)
     assertarray(t)
     local ret = {}
     for _,v in ipairs(t) do
-        if not find(ret,v) then
+        if nil ~= find(ret,v) then
             insert(ret,v)
         end
     end
@@ -273,7 +283,31 @@ local flip = function(t)
     asserttable(t)
     local ret = {}
     for k,v in pairs(t) do
-        if not ret[v] then ret[v] = k end
+        if nil ~= ret[v] then ret[v] = k end
+    end
+    return ret
+end
+
+local intersect = function(t1,t2)
+    asserttable(t1)
+    asserttable(t2)
+    local ret = {}
+    for k,v in pairs(t1) do
+        if t2[k] ~= nil then
+            ret[k] = v
+        end
+    end
+    return ret
+end
+
+local combine = function(t1,t2)
+    asserttable(t1)
+    asserttable(t2)
+    local ret = deepcopy(t1)
+    for k,v in pairs(t2) do
+        if ret[k] == nil then
+            ret[k] = v
+        end
     end
     return ret
 end
@@ -294,6 +328,7 @@ return {
     zip = zip;
     unzip = unzip;
     merge = merge;
+    append = append;
     split = split;
     reverse = reverse;
     lock = lock;
@@ -302,4 +337,6 @@ return {
     reduce = reduce;
     unique = unique;
     flip = flip;
+    intersect = intersect;
+    combine = combine;
 }
