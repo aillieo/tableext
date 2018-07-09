@@ -96,6 +96,7 @@ local function serializefunc(obj,indent)
         indenttable[indent] = rep(" ",indent)
     end
     local function append(str) return insert(ret, str) end
+    local function appendline() if indent then append("\n") end end
     local t = type(obj)
     if t == "number" then
         append(obj)
@@ -104,28 +105,35 @@ local function serializefunc(obj,indent)
     elseif t == "string" then
         append(format("%q", obj))
     elseif t == "table" then
-        append("{\n")
-        for k, v in pairs(obj) do
-            append(indenttable[indent and indent +1])
-            append("[")
-            append(serializefunc(k,indent and indent +1))
-            append("]=")
-            append(serializefunc(v,indent and indent +1))
-            append(",\n")
-        end
         local metatable = getmetatable(obj)
-        if metatable ~= nil and type(metatable.__index) == "table" then
-            for k, v in pairs(metatable.__index) do
+        if metatable and type(metatable.__tostring) == "function" then
+            append(tostring(obj))
+        else
+            append("{")
+            appendline()
+            for k, v in pairs(obj) do
                 append(indenttable[indent and indent +1])
                 append("[")
                 append(serializefunc(k,indent and indent +1))
                 append("]=")
                 append(serializefunc(v,indent and indent +1))
-                append(",\n")
+                append(",")
+                appendline()
             end
+            if metatable ~= nil and type(metatable.__index) == "table" then
+                for k, v in pairs(metatable.__index) do
+                    append(indenttable[indent and indent +1])
+                    append("[")
+                    append(serializefunc(k,indent and indent +1))
+                    append("]=")
+                    append(serializefunc(v,indent and indent +1))
+                    append(",")
+                    appendline()
+                end
+            end
+            append(indenttable[indent])
+            append("}")
         end
-        append(indenttable[indent])
-        append("}")
     elseif t == "nil" then
         return nil
     elseif indent then
@@ -140,25 +148,25 @@ local serialize = function(t)
     return serializefunc(t)
 end
 
-local unserialize = function(str)
+local deserialize = function(str)
     local t = type(str)
     if t == "nil" or str == "" then
         return nil
     elseif t == "number" or t == "string" or t == "boolean" then
         str = tostring(str)
     else
-        error("failed to unserialize type " .. t)
+        error("failed to deserialize type " .. t)
     end
     str = "return " .. str
     local func = loadstring(str)
     if func == nil then
-        error("unserialize failed ... got invalid string")
+        error("deserialize failed ... got invalid string")
     end
     return func()
 end
 
 local printtable = function(t)
-    return print(tostring(t) .. " = " .. serializefunc(t,1))
+    return print(serializefunc(t,1))
 end
 
 local zip = function(tk,tv)
@@ -323,7 +331,7 @@ return {
     deepcopy = deepcopy;
     find = find;
     serialize = serialize;
-    unserialize = unserialize;
+    deserialize = deserialize;
     printtable = printtable;
     zip = zip;
     unzip = unzip;
