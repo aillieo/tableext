@@ -31,8 +31,12 @@ local asserttable = function(t)
     assert(istable(t), "invalid argument: table expected, got " .. type(t))
 end
 
+local assertstring = function(t)
+    assert(type(t) == "string", "invalid argument: string expected, got " .. type(t))
+end
+
 local assertarray = function(t)
-    asserttable(t);
+    asserttable(t)
     assert(isarray(t), "invalid argument: not an array-table")
 end
 
@@ -52,11 +56,46 @@ local size = function(t)
     end
     return ret
 end
+
 local clear = function(t)
     asserttable(t)
     for k in pairs(t) do
         t[k] = nil
     end
+end
+
+local map = function(t, func)
+    asserttable(t)
+    local ret = {}
+    for k,v in pairs(t) do
+        ret[k] = func(v)
+    end
+    return ret
+end
+
+local filter = function(t, func)
+    asserttable(t)
+    local ret = {}
+    if isarray(t) then
+        for _,v in ipairs(t) do
+            if func(v) then insert(ret,v) end
+        end
+    else
+        for k,v in pairs(t) do
+            if func(v) then ret[k] = v end
+        end
+    end
+    return ret
+end
+
+local reduce = function(t, func)
+    assertarray(t)
+    local ret = t[1]
+    local n = #t
+    for i = 2, n do
+        ret = func(ret,t[i])
+    end
+    return ret
 end
 
 local deepcopy = function(t)
@@ -75,7 +114,6 @@ local deepcopy = function(t)
         return setmetatable(tocopy, getmetatable(t))
     end
     return copy(t)
-
 end
 
 local find = function(t,v)
@@ -89,63 +127,109 @@ local find = function(t,v)
     return nil
 end
 
-local indenttable = {}
-local function serializefunc(obj,indent)
-    local ret = {}
-    if indent and not indenttable[indent] then
-        indenttable[indent] = rep(" ",indent)
+local textbuffermeta = {
+    __index = {
+        append = function(self,text)
+            assertstring(text)
+            self._len = self._len + 1
+            self._data[self._len] = text
+            return self
+        end
+    },
+    __concat = function(self,text)
+        return self:append(text)
+    end,
+    __tostring = function(self)
+        if self._len > 1 then
+            self._data = {concat(self._data,self._sep or "\n")}
+            self._len = 1
+        end
+        return self._data[1] or ""
     end
-    local function append(str) return insert(ret, str) end
-    local function appendline() if indent then append("\n") end end
+}
+
+local function textbuffer(sep)
+    sep = sep or ""
+    return setmetatable({_len = 0, _data = {}, _sep = sep},textbuffermeta)
+end
+
+
+local indenttable = setmetatable({},{__index = function(t,k) t[k] = rep("    ",k) return t[k] end })
+local function serializefunc(args)
+    local obj,curpath = args.obj,args.curpath or "t"
+    local forprint,indent = args.forprint or false,args.indent or 0
+    local saved,refs = args.saved or {}, args.refs or textbuffer()
+    local ret = textbuffer()
+    local function append(str) return ret:append(str) end
+    local function appendline() return ret:append("\n") end
+    local function appendkv(k,v)
+        return ret:append("["):append(tostring(k)):append("]="):append(tostring(v))
+    end
+    local function serializekv(k,v)
+        local serializedk = serializefunc{obj = k,indent = indent +1, forprint = forprint,saved = saved,refs = refs,curpath = curpath }
+        local serializedv = serializefunc{obj = v,indent = indent +1, forprint = forprint,saved = saved,refs = refs,curpath = format("%s[%s]",curpath,serializedk)}
+        if serializedk~= nil and serializedv~= nil then
+            append(indenttable[indent +1])
+            appendkv(serializedk,serializedv)
+            append(",")
+            appendline()
+        end
+    end
+
     local t = type(obj)
     if t == "number" then
-        append(obj)
+        append(tostring(obj))
     elseif t == "boolean" then
         append(tostring(obj))
     elseif t == "string" then
         append(format("%q", obj))
     elseif t == "table" then
-        local metatable = getmetatable(obj)
-        if metatable and type(metatable.__tostring) == "function" then
-            append(tostring(obj))
+        if saved[obj] then
+            refs:append("\n"):append(curpath):append("="):append(saved[obj])
+            return nil
         else
-            append("{")
-            appendline()
-            for k, v in pairs(obj) do
-                append(indenttable[indent and indent +1])
-                append("[")
-                append(serializefunc(k,indent and indent +1))
-                append("]=")
-                append(serializefunc(v,indent and indent +1))
-                append(",")
+            saved[obj] = curpath
+            local metatable = getmetatable(obj)
+            if forprint and metatable and type(metatable.__tostring) == "function" then
+                append(tostring(obj))
+            else
+                append("{")
                 appendline()
-            end
-            if metatable ~= nil and type(metatable.__index) == "table" then
-                for k, v in pairs(metatable.__index) do
-                    append(indenttable[indent and indent +1])
-                    append("[")
-                    append(serializefunc(k,indent and indent +1))
-                    append("]=")
-                    append(serializefunc(v,indent and indent +1))
-                    append(",")
-                    appendline()
+                for k, v in pairs(obj) do
+                    serializekv(k,v)
                 end
+                if metatable ~= nil and type(metatable.__index) == "table" then
+                    for k, v in pairs(metatable.__index) do
+                        serializekv(k,v)
+                    end
+                end
+                append(indenttable[indent])
+                append("}")
             end
-            append(indenttable[indent])
-            append("}")
         end
     elseif t == "nil" then
-        return nil
-    elseif indent then
+        if forprint then
+            append("nil")
+        else
+            return nil
+        end
+    elseif forprint then
         append(tostring(obj))
     else
         error("failed to serialize type " .. t)
+        return nil
     end
-    return concat(ret)
+    return ret,refs
 end
 
 local serialize = function(t)
-    return serializefunc(t)
+    local ret,refs = serializefunc{obj = t, forprint = false, curpath = "t"}
+    local refstr = tostring(refs)
+    if refstr == "" then
+        return tostring(ret)
+    else
+        return "local t =" .. tostring(ret:append("\n"):append(refstr))
+    end
 end
 
 local deserialize = function(str)
@@ -158,6 +242,7 @@ local deserialize = function(str)
         error("failed to deserialize type " .. t)
     end
     str = "return " .. str
+    -- str .. "\n return t"
     local func = loadstring(str)
     if func == nil then
         error("deserialize failed ... got invalid string")
@@ -166,7 +251,13 @@ local deserialize = function(str)
 end
 
 local printtable = function(t)
-    return print(serializefunc(t,1))
+    local ret,refs = serializefunc{obj = t, forprint = true, curpath = "t"}
+    local refstr = tostring(refs)
+    if refstr == "" then
+        print(tostring(ret))
+    else
+        print("local t =" .. tostring(ret:append("\n"):append(refstr)))
+    end
 end
 
 local zip = function(tk,tv)
@@ -235,45 +326,10 @@ end
 local lock = function(t)
     asserttable(t)
     return setmetatable({},{
-        __index = t;
-        __newindex = function(t,k) error("failed to add/change value for index/key ".. k) end;
+        __index = t,
+        __newindex = function(t,k) error("failed to add/change value for index/key ".. k) end,
         __metatable = "table is locked" })
 end
-
-local map = function(t, func)
-    asserttable(t)
-    local ret = {}
-    for k,v in pairs(t) do
-        ret[k] = func(v)
-    end
-    return ret
-end
-
-local filter = function(t, func)
-    asserttable(t)
-    local ret = {}
-    if isarray(t) then
-        for _,v in ipairs(t) do
-            if func(v) then insert(ret,v) end
-        end
-    else
-        for k,v in pairs(t) do
-            if func(v) then ret[k] = v end
-        end
-    end
-    return ret
-end
-
-local reduce = function(t, func)
-    assertarray(t)
-    local ret = t[1]
-    local n = #t
-    for i = 2, n do
-        ret = func(ret,t[i])
-    end
-    return ret
-end
-
 
 local unique = function(t)
     assertarray(t)
@@ -347,4 +403,5 @@ return {
     flip = flip;
     intersect = intersect;
     combine = combine;
+    textbuffer = textbuffer;
 }
