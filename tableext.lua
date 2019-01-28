@@ -9,12 +9,14 @@ local format,rep = string.format,string.rep
 local insert, concat = table.insert, table.concat
 local floor = math.floor
 
-local istable = function(t)
+local _ = {}
+
+function _.istable(t)
     return type(t) == "table"
 end
 
-local isarray = function(t)
-    if not istable(t) then return false end
+function _.isarray(t)
+    if not _.istable(t) then return false end
     local len = #t
     for i in pairs(t) do
         if type(i) ~= "number" then
@@ -27,29 +29,33 @@ local isarray = function(t)
     return true
 end
 
-local asserttable = function(t)
-    assert(istable(t), "invalid argument: table expected, got " .. type(t))
+function _.asserttable(t)
+    assert(_.istable(t), "invalid argument: table expected, got " .. type(t))
 end
 
-local assertstring = function(t)
+function _.assertstring(t)
     assert(type(t) == "string", "invalid argument: string expected, got " .. type(t))
 end
 
-local assertarray = function(t)
-    asserttable(t)
-    assert(isarray(t), "invalid argument: not an array-table")
+function _.assertarray(t)
+    assert(_.isarray(t), "invalid argument: not an array-table")
 end
 
-local assertnotnil = function(arg)
+function _.assertfunction(t)
+    assert(type(t) == "function", "invalid argument: function expected, got " .. type(t))
+end
+
+function _.assertnotnil(arg)
     assert(nil ~= arg, "invalid argument: nil")
 end
 
-local isempty = function(t)
-    asserttable(t)
-    return next(t) == nil end
+function _.isempty(t)
+    _.asserttable(t)
+    return next(t) == nil
+end
 
-local size = function(t)
-    asserttable(t)
+function _.size(t)
+    _.asserttable(t)
     local ret = 0
     for _ in pairs(t) do
         ret = ret + 1
@@ -57,15 +63,15 @@ local size = function(t)
     return ret
 end
 
-local clear = function(t)
-    asserttable(t)
+function _.clear(t)
+    _.asserttable(t)
     for k in pairs(t) do
         t[k] = nil
     end
 end
 
-local map = function(t, func)
-    asserttable(t)
+function _.map(t, func)
+    _.asserttable(t)
     local ret = {}
     for k,v in pairs(t) do
         ret[k] = func(v)
@@ -73,10 +79,11 @@ local map = function(t, func)
     return ret
 end
 
-local filter = function(t, func)
-    asserttable(t)
+function _.filter(t, func)
+    _.asserttable(t)
+    _.assertfunction(func)
     local ret = {}
-    if isarray(t) then
+    if _.isarray(t) then
         for _,v in ipairs(t) do
             if func(v) then insert(ret,v) end
         end
@@ -88,8 +95,9 @@ local filter = function(t, func)
     return ret
 end
 
-local reduce = function(t, func)
-    assertarray(t)
+function _.reduce(t, func)
+    _.assertarray(t)
+    _.assertfunction(func)
     local ret = t[1]
     local n = #t
     for i = 2, n do
@@ -98,10 +106,10 @@ local reduce = function(t, func)
     return ret
 end
 
-local deepcopy = function(t)
+function _.deepcopy(t)
     local copied = {}
     local function copy(t)
-        if not istable(t) then
+        if not _.istable(t) then
             return t
         elseif copied[t] then
             return copied[t]
@@ -116,9 +124,9 @@ local deepcopy = function(t)
     return copy(t)
 end
 
-local find = function(t,v)
-    asserttable(t)
-    assertnotnil(v)
+function _.find(t,v)
+    _.asserttable(t)
+    _.assertnotnil(v)
     for k1,v1 in pairs(t) do
         if v1 == v then
             return k1
@@ -130,7 +138,7 @@ end
 local textbuffermeta = {
     __index = {
         append = function(self,text)
-            assertstring(text)
+            _.assertstring(text)
             self._len = self._len + 1
             self._data[self._len] = text
             return self
@@ -148,18 +156,17 @@ local textbuffermeta = {
     end
 }
 
-local function textbuffer(sep)
+function _.textbuffer(sep)
     sep = sep or ""
     return setmetatable({_len = 0, _data = {}, _sep = sep},textbuffermeta)
 end
-
 
 local indenttable = setmetatable({},{__index = function(t,k) t[k] = rep("    ",k) return t[k] end })
 local function serializefunc(args)
     local obj,curpath = args.obj,args.curpath or "t"
     local forprint,indent = args.forprint or false,args.indent or 0
-    local saved,refs = args.saved or {}, args.refs or textbuffer()
-    local ret = textbuffer()
+    local saved,refs = args.saved or {}, args.refs or _.textbuffer()
+    local ret = _.textbuffer()
     local function append(str) return ret:append(str) end
     local function appendline() return ret:append("\n") end
     local function appendkv(k,v)
@@ -222,7 +229,7 @@ local function serializefunc(args)
     return ret,refs
 end
 
-local serialize = function(t)
+function _.serialize(t)
     local ret,refs = serializefunc{obj = t, forprint = false, curpath = "t"}
     local refstr = tostring(refs)
     if refstr == "" then
@@ -232,7 +239,17 @@ local serialize = function(t)
     end
 end
 
-local deserialize = function(str)
+function _.printtable(t)
+    local ret,refs = serializefunc{obj = t, forprint = true, curpath = "t"}
+    local refstr = tostring(refs)
+    if refstr == "" then
+        print(tostring(ret))
+    else
+        print("local t =" .. tostring(ret:append("\n"):append(refstr)))
+    end
+end
+
+function _.deserialize(str)
     local t = type(str)
     if t == "nil" or str == "" then
         return nil
@@ -250,19 +267,9 @@ local deserialize = function(str)
     return func()
 end
 
-local printtable = function(t)
-    local ret,refs = serializefunc{obj = t, forprint = true, curpath = "t"}
-    local refstr = tostring(refs)
-    if refstr == "" then
-        print(tostring(ret))
-    else
-        print("local t =" .. tostring(ret:append("\n"):append(refstr)))
-    end
-end
-
-local zip = function(tk,tv)
-    assertarray(tk)
-    assertarray(tv)
+function _.zip(tk,tv)
+    _.assertarray(tk)
+    _.assertarray(tv)
     local len, ret = 0,{}
     local lenk, lenv = #tk, #tv
     len = lenk < lenv and lenk or lenv
@@ -272,8 +279,8 @@ local zip = function(tk,tv)
     return ret
 end
 
-local unzip = function(t)
-    asserttable(t)
+function _.unzip(t)
+    _.asserttable(t)
     local tk,tv = {},{}
     for k,v in pairs(t) do
         insert(tk,k)
@@ -282,26 +289,27 @@ local unzip = function(t)
     return tk,tv
 end
 
-local merge = function(tto,tfrom)
-    asserttable(tto)
-    asserttable(tfrom)
+function _.merge(tto,tfrom)
+    _.asserttable(tto)
+    _.asserttable(tfrom)
     for k, v in pairs(tfrom) do
         tto[k] = v
     end
+    return tto
 end
 
-
-local append = function(fst, sec)
-    assertarray(fst)
-    assertarray(sec)
+function _.append(fst, sec)
+    _.assertarray(fst)
+    _.assertarray(sec)
     local l = #fst
     for i,v in ipairs(sec) do
         fst[l+i] = v
     end
+    return fst
 end
 
-local split = function(t)
-    asserttable(t)
+function _.split(t)
+    _.asserttable(t)
     local arr, rec = {}, {}
     for i=1, #t do
         arr[i] = t[i]
@@ -314,94 +322,103 @@ local split = function(t)
     return arr, rec
 end
 
-local reverse = function(t)
-    assertarray(t)
+function _.reverse(t)
+    _.assertarray(t)
     local n = #t+1
     local half = floor(n/2)
     for i= 1, half do
         t[i], t[n-i] = t[n - i], t[i]
     end
+    return t
 end
 
-local lock = function(t)
-    asserttable(t)
+function _.lock(t)
+    _.asserttable(t)
     return setmetatable({},{
         __index = t,
         __newindex = function(t,k) error("failed to add/change value for index/key ".. k) end,
-        __metatable = "table is locked" })
+        __metatable = "table is locked"
+    })
 end
 
-local unique = function(t)
-    assertarray(t)
+function _.unique(t)
+    _.assertarray(t)
     local ret = {}
-    for _,v in ipairs(t) do
-        if nil ~= find(ret,v) then
+    for i,v in ipairs(t) do
+        if nil == _.find(ret,v) then
             insert(ret,v)
         end
     end
     return ret
 end
 
-
-local flip = function(t)
-    asserttable(t)
+function _.flip(t)
+    _.asserttable(t)
     local ret = {}
     for k,v in pairs(t) do
-        if nil ~= ret[v] then ret[v] = k end
+        if nil == ret[v] then ret[v] = k end
     end
     return ret
 end
 
-local intersect = function(t1,t2)
-    asserttable(t1)
-    asserttable(t2)
+function _.intersect(t1,t2)
+    _.asserttable(t1)
+    _.asserttable(t2)
     local ret = {}
-    for k,v in pairs(t1) do
-        if t2[k] ~= nil then
-            ret[k] = v
+    for k,_ in pairs(t2) do
+        if t1[k] ~= nil then
+            ret[k] = t1[k]
         end
     end
     return ret
 end
 
-local combine = function(t1,t2)
-    asserttable(t1)
-    asserttable(t2)
-    local ret = deepcopy(t1)
-    for k,v in pairs(t2) do
-        if ret[k] == nil then
-            ret[k] = v
-        end
+function _.combine(t1,t2)
+    _.asserttable(t1)
+    _.asserttable(t2)
+    local ret = _.deepcopy(t2)
+    for k,_ in pairs(t1) do
+        ret[k] = t1[k]
     end
     return ret
 end
 
+function _.equal(t1, t2)
+        if not _.istable(t1) or not _.istable(t2) then return t1 == t2 end
+        if _.size(t1) ~= _.size(t2) then return false end
+        for k,v in pairs(t1) do
+            if not _.equal(v,t2[k]) then return false
+        end
+        return true
+    end
+end
 
 return {
-    NAME = "tableext";
-    REPO = "https://github.com/aillieo/tableext";
-    isempty = isempty;
-    size = size;
-    isarray = isarray;
-    clear = clear;
-    deepcopy = deepcopy;
-    find = find;
-    serialize = serialize;
-    deserialize = deserialize;
-    printtable = printtable;
-    zip = zip;
-    unzip = unzip;
-    merge = merge;
-    append = append;
-    split = split;
-    reverse = reverse;
-    lock = lock;
-    map = map;
-    filter = filter;
-    reduce = reduce;
-    unique = unique;
-    flip = flip;
-    intersect = intersect;
-    combine = combine;
-    textbuffer = textbuffer;
+    NAME = "tableext",
+    REPO = "https://github.com/aillieo/tableext",
+    isempty = _.isempty,
+    size = _.size,
+    isarray = _.isarray,
+    clear = _.clear,
+    deepcopy = _.deepcopy,
+    find = _.find,
+    serialize = _.serialize,
+    deserialize = _.deserialize,
+    printtable = _.printtable,
+    zip = _.zip,
+    unzip = _.unzip,
+    merge = _.merge,
+    append = _.append,
+    split = _.split,
+    reverse = _.reverse,
+    lock = _.lock,
+    map = _.map,
+    filter = _.filter,
+    reduce = _.reduce,
+    unique = _.unique,
+    flip = _.flip,
+    intersect = _.intersect,
+    combine = _.combine,
+    textbuffer = _.textbuffer,
+    equal = _.equal
 }
