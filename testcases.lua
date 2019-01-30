@@ -172,5 +172,19 @@ do
     assert(te.equal(a,b))
 end
 
+-- findall
+do
+    local a = {a=1,b=2,c=3,d=4,e=5}
+    local b = te.findall(a,function(n) return n%2 == 0 end)
+    assert(te.equal(b,{b=2,d=4}))
+end
+
+-- removeall
+do
+    local a = {a=1,b=2,c=3,d=4,e=5}
+    te.removeall(a,function(n) return n%2 == 0 end)
+    assert(te.equal(a,{a=1,c=3,e=5}))
+end
+
 local cost = os.clock() - time
 print("All cases passed successfully!\n cost time " .. cost)

@@ -72,6 +72,7 @@ end
 
 function _.map(t, func)
     _.asserttable(t)
+    _.assertfunction(func)
     local ret = {}
     for k,v in pairs(t) do
         ret[k] = func(v)
@@ -80,17 +81,11 @@ function _.map(t, func)
 end
 
 function _.filter(t, func)
-    _.asserttable(t)
+    _.assertarray(t)
     _.assertfunction(func)
     local ret = {}
-    if _.isarray(t) then
-        for _,v in ipairs(t) do
-            if func(v) then insert(ret,v) end
-        end
-    else
-        for k,v in pairs(t) do
-            if func(v) then ret[k] = v end
-        end
+    for _,v in ipairs(t) do
+        if func(v) then insert(ret,v) end
     end
     return ret
 end
@@ -135,7 +130,7 @@ function _.find(t,v)
     return nil
 end
 
-local textbuffermeta = {
+_.textbuffermeta = {
     __index = {
         append = function(self,text)
             _.assertstring(text)
@@ -158,11 +153,11 @@ local textbuffermeta = {
 
 function _.textbuffer(sep)
     sep = sep or ""
-    return setmetatable({_len = 0, _data = {}, _sep = sep},textbuffermeta)
+    return setmetatable({_len = 0, _data = {}, _sep = sep},_.textbuffermeta)
 end
 
-local indenttable = setmetatable({},{__index = function(t,k) t[k] = rep("    ",k) return t[k] end })
-local function serializefunc(args)
+_.indenttable = setmetatable({},{__index = function(t,k) t[k] = rep("    ",k) return t[k] end })
+function _.serializefunc(args)
     local obj,curpath = args.obj,args.curpath or "t"
     local forprint,indent = args.forprint or false,args.indent or 0
     local saved,refs = args.saved or {}, args.refs or _.textbuffer()
@@ -173,10 +168,10 @@ local function serializefunc(args)
         return ret:append("["):append(tostring(k)):append("]="):append(tostring(v))
     end
     local function serializekv(k,v)
-        local serializedk = serializefunc{obj = k,indent = indent +1, forprint = forprint,saved = saved,refs = refs,curpath = curpath }
-        local serializedv = serializefunc{obj = v,indent = indent +1, forprint = forprint,saved = saved,refs = refs,curpath = format("%s[%s]",curpath,serializedk)}
+        local serializedk = _.serializefunc{obj = k,indent = indent +1, forprint = forprint,saved = saved,refs = refs,curpath = curpath }
+        local serializedv = _.serializefunc{obj = v,indent = indent +1, forprint = forprint,saved = saved,refs = refs,curpath = format("%s[%s]",curpath,serializedk)}
         if serializedk~= nil and serializedv~= nil then
-            append(indenttable[indent +1])
+            append(_.indenttable[indent +1])
             appendkv(serializedk,serializedv)
             append(",")
             appendline()
@@ -210,7 +205,7 @@ local function serializefunc(args)
                         serializekv(k,v)
                     end
                 end
-                append(indenttable[indent])
+                append(_.indenttable[indent])
                 append("}")
             end
         end
@@ -230,7 +225,7 @@ local function serializefunc(args)
 end
 
 function _.serialize(t)
-    local ret,refs = serializefunc{obj = t, forprint = false, curpath = "t"}
+    local ret,refs = _.serializefunc{obj = t, forprint = false, curpath = "t"}
     local refstr = tostring(refs)
     if refstr == "" then
         return tostring(ret)
@@ -240,7 +235,7 @@ function _.serialize(t)
 end
 
 function _.printtable(t)
-    local ret,refs = serializefunc{obj = t, forprint = true, curpath = "t"}
+    local ret,refs = _.serializefunc{obj = t, forprint = true, curpath = "t"}
     local refstr = tostring(refs)
     if refstr == "" then
         print(tostring(ret))
@@ -393,6 +388,29 @@ function _.equal(t1, t2)
     end
 end
 
+function _.findall(t,func)
+    _.asserttable(t)
+    _.assertfunction(func)
+    local ret = {}
+    for k,v in pairs(t) do
+        if func(v) then
+            ret[k] = v
+        end
+    end
+    return ret
+end
+
+function _.removeall(t,func)
+    _.asserttable(t)
+    _.assertfunction(func)
+    for k,v in pairs(t) do
+        if func(v) then
+            t[k] = nil
+        end
+    end
+    return t
+end
+
 return {
     NAME = "tableext",
     REPO = "https://github.com/aillieo/tableext",
@@ -420,5 +438,7 @@ return {
     intersect = _.intersect,
     combine = _.combine,
     textbuffer = _.textbuffer,
-    equal = _.equal
+    equal = _.equal,
+    findall = _.findall,
+    removeall = _.removeall
 }
