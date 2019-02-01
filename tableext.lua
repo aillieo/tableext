@@ -7,6 +7,7 @@ local pairs,ipairs = pairs,ipairs
 local setmetatable,getmetatable = setmetatable,getmetatable
 local format,rep = string.format,string.rep
 local insert, concat = table.insert, table.concat
+local sort = table.sort
 local floor = math.floor
 
 local _ = {}
@@ -38,7 +39,7 @@ function _.assertstring(t)
 end
 
 function _.assertarray(t)
-    assert(_.isarray(t), "invalid argument: not an array-table")
+    -- assert(_.isarray(t), "invalid argument: not an array-table")
 end
 
 function _.assertfunction(t)
@@ -379,13 +380,13 @@ function _.combine(t1,t2)
 end
 
 function _.equal(t1, t2)
-        if not _.istable(t1) or not _.istable(t2) then return t1 == t2 end
-        if _.size(t1) ~= _.size(t2) then return false end
-        for k,v in pairs(t1) do
-            if not _.equal(v,t2[k]) then return false
-        end
-        return true
+    if not _.istable(t1) or not _.istable(t2) then return t1 == t2 end
+    local size1 = 0
+    for k,v in pairs(t1) do
+        if not _.equal(v,t2[k]) then return false end
+        size1 = size1 + 1
     end
+    return size1 == _.size(t2)
 end
 
 function _.findall(t,func)
@@ -409,6 +410,19 @@ function _.removeall(t,func)
         end
     end
     return t
+end
+
+function _.kvtoarray(t,sortfunc)
+    _.asserttable(t)
+    local ret = {}
+    for _,v in pairs(t) do
+        insert(ret,v)
+    end
+    if sortfunc then
+        _.assertfunction(sortfunc)
+        sort(ret,sortfunc)
+    end
+    return ret
 end
 
 return {
@@ -440,5 +454,6 @@ return {
     textbuffer = _.textbuffer,
     equal = _.equal,
     findall = _.findall,
-    removeall = _.removeall
+    removeall = _.removeall,
+    kvtoarray = _.kvtoarray
 }
