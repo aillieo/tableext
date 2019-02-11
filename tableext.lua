@@ -1,5 +1,5 @@
 local error,assert = error,assert
-local print,tostring = print,tostring
+local tostring = tostring
 local loadstring = loadstring or load
 local type = type
 local next = next
@@ -39,7 +39,7 @@ function _.assertstring(t)
 end
 
 function _.assertarray(t)
-    -- assert(_.isarray(t), "invalid argument: not an array-table")
+    assert(_.isarray(t), "invalid argument: not an array-table")
 end
 
 function _.assertfunction(t)
@@ -235,13 +235,15 @@ function _.serialize(t)
     end
 end
 
-function _.printtable(t)
+function _.printtable(t,printfunc)
+    printfunc = printfunc or print
+    _.assertfunction(printfunc)
     local ret,refs = _.serializefunc{obj = t, forprint = true, curpath = "t"}
     local refstr = tostring(refs)
     if refstr == "" then
-        print(tostring(ret))
+        printfunc(tostring(ret))
     else
-        print("local t =" .. tostring(ret:append("\n"):append(refstr)))
+        printfunc("local t =" .. tostring(ret:append("\n"):append(refstr)))
     end
 end
 
