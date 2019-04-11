@@ -427,6 +427,22 @@ function _.kvtoarray(t,sortfunc)
     return ret
 end
 
+function _.flat(t)
+    local ret = {}
+    local function flat(t)
+        _.assertarray(t)
+        for i,v in ipairs(t) do
+            if _.isarray(v) then
+                flat(v)
+            else
+                insert(ret,v)
+            end
+        end
+    end
+    flat(t)
+    return ret
+end
+
 return {
     NAME = "tableext",
     REPO = "https://github.com/aillieo/tableext",
@@ -457,5 +473,6 @@ return {
     equal = _.equal,
     findall = _.findall,
     removeall = _.removeall,
-    kvtoarray = _.kvtoarray
+    kvtoarray = _.kvtoarray,
+    flat = _.flat
 }

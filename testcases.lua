@@ -208,5 +208,11 @@ do
     assert(te.equal(b,{{3,3,3},{1,2},{0}}))
 end
 
+-- flat
+do
+    local t = {1,{2,3},4,5,{6,{7,{8,9},10}}}
+    assert(te.equal(te.flat(t),{1,2,3,4,5,6,7,8,9,10}))
+end
+
 local cost = os.clock() - time
 print("All cases passed successfully!\n cost time " .. cost)
