@@ -18,16 +18,11 @@ end
 
 function _.isarray(t)
     if not _.istable(t) then return false end
-    local len = #t
-    for i in pairs(t) do
-        if type(i) ~= "number" then
-            return false
-        end
-        if i > len then
-            return false
-        end
+    local k = #t
+    if k == 0 then
+        return next(t) == nil
     end
-    return true
+    return next(t,k) == nil
 end
 
 function _.asserttable(t)
@@ -58,7 +53,9 @@ end
 function _.size(t)
     _.asserttable(t)
     local ret = 0
-    for _ in pairs(t) do
+    local k = next(t)
+    while k ~= nil do
+        k = next(t,k)
         ret = ret + 1
     end
     return ret
@@ -66,8 +63,10 @@ end
 
 function _.clear(t)
     _.asserttable(t)
-    for k in pairs(t) do
+    local k = next(t)
+    while k ~= nil do
         t[k] = nil
+        k = next(t,k)
     end
 end
 
