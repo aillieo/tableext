@@ -114,7 +114,13 @@ function _.deepcopy(t)
             tocopy[copy(k)] = copy(v)
         end
         copied[t] = tocopy
-        return setmetatable(tocopy, getmetatable(t))
+        local metatable = getmetatable(t)
+        if _.istable(metatable) then
+            return setmetatable(tocopy, metatable)
+        elseif metatable ~= nil then
+            error("can not handle metatable with type " .. type(metatable))
+        end
+        return tocopy
     end
     return copy(t)
 end
@@ -228,9 +234,9 @@ function _.serialize(t)
     local ret,refs = _.serializefunc{obj = t, forprint = false, curpath = "t"}
     local refstr = tostring(refs)
     if refstr == "" then
-        return tostring(ret)
+        return "return " .. tostring(ret)
     else
-        return "local t =" .. tostring(ret:append("\n"):append(refstr))
+        return "local t =" .. tostring(ret:append("\n"):append(refstr):append("\n")) .. "return t"
     end
 end
 
@@ -255,8 +261,6 @@ function _.deserialize(str)
     else
         error("failed to deserialize type " .. t)
     end
-    str = "return " .. str
-    -- str .. "\n return t"
     local func = loadstring(str)
     if func == nil then
         error("deserialize failed ... got invalid string")
