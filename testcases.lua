@@ -119,9 +119,11 @@ end
 
 -- map
 do
-    local b = te.map(simpleArray,tostring)
-    local c = {"1","2","3"}
-    assert(te.equal(b,c))
+    local a = te.map(simpleArray,tostring)
+    local b = {"1","2","3"}
+    assert(te.equal(a,b))
+    local c = te.map(simpleArray,b)
+    assert(te.equal(c,b))
 end
 
 -- filter
@@ -129,6 +131,9 @@ do
     local a = {1,2,3,4,5}
     local b = te.filter(a,function(i) return i%2 == 0 end)
     assert(te.equal(b,{2,4}))
+    local c = {false,true,false,true}
+    local d = te.filter(a,c)
+    assert(te.equal(d,{2,4}))
 end
 
 -- reduce
@@ -190,15 +195,20 @@ end
 -- findall
 do
     local a = {a=1,b=2,c=3,d=4,e=5}
-    local b = te.findall(a,function(n) return n%2 == 0 end)
+    local b = te.findall(a,function(k,n) return n%2 == 0 end)
     assert(te.equal(b,{b=2,d=4}))
+    local c = {[2]=true, [4]=true}
+    local d = te.findall(a,c)
+    assert(te.equal(d,{b=2,d=4}))
 end
 
 -- removeall
 do
     local a = {a=1,b=2,c=3,d=4,e=5}
-    te.removeall(a,function(n) return n%2 == 0 end)
+    te.removeall(a,function(k,n) return n%2 == 0 end)
     assert(te.equal(a,{a=1,c=3,e=5}))
+    te.removeall(a,{[3]=true})
+    assert(te.equal(a,{a=1,e=5}))
 end
 
 -- kvtoarray
@@ -212,6 +222,17 @@ end
 do
     local t = {1,{2,3},4,5,{6,{7,{8,9},10}}}
     assert(te.equal(te.flat(t),{1,2,3,4,5,6,7,8,9,10}))
+end
+
+-- pairsinorder
+do
+    local t = {a=1,b=2,c=3,d=1,e=2,f=3}
+    local keysinorder = {"a","b","c","d","e","f"}
+    local keys = {}
+    for k,v,i in te.pairsinorder(t) do
+        table.insert(keys, k)
+    end
+    assert(te.equal(keysinorder, keys))
 end
 
 local cost = os.clock() - time

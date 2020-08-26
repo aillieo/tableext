@@ -41,6 +41,12 @@ function _.assertfunction(t)
     assert(type(t) == "function", "invalid argument: function expected, got " .. type(t))
 end
 
+function _.ensurefunctionortable(t)
+    local typeoft = type(t)
+    assert(typeoft == "function" or typeoft == "table", "invalid argument: function or table expected, got " .. type(t))
+    return typeoft
+end
+
 function _.assertnotnil(arg)
     assert(nil ~= arg, "invalid argument: nil")
 end
@@ -70,9 +76,7 @@ function _.clear(t)
     end
 end
 
-function _.map(t, func)
-    _.asserttable(t)
-    _.assertfunction(func)
+function _.mapf(t, func)
     local ret = {}
     for k,v in pairs(t) do
         ret[k] = func(v)
@@ -80,14 +84,48 @@ function _.map(t, func)
     return ret
 end
 
-function _.filter(t, func)
-    _.assertarray(t)
-    _.assertfunction(func)
+function _.mapt(t, tbl)
+    local ret = {}
+    for k,v in pairs(t) do
+        ret[k] = tbl[v]
+    end
+    return ret
+end
+
+function _.map(t, functbl)
+    _.asserttable(t)
+    local tp = _.ensurefunctionortable(functbl)
+    if tp == "function" then
+        return _.mapf(t, functbl)
+    else
+        return _.mapt(t, functbl)
+    end
+end
+
+function _.filterf(t, func)
     local ret = {}
     for _,v in ipairs(t) do
         if func(v) then insert(ret,v) end
     end
     return ret
+end
+
+function _.filtert(t, tbl)
+    local ret = {}
+    for _,v in ipairs(t) do
+        if tbl[v] then insert(ret,v) end
+    end
+    return ret
+end
+
+function _.filter(t, functbl)
+    _.asserttable(t)
+    local tp = _.ensurefunctionortable(functbl)
+    if tp == "function" then
+        return _.filterf(t, functbl)
+    else
+        return _.filtert(t, functbl)
+    end
 end
 
 function _.reduce(t, func)
@@ -394,27 +432,62 @@ function _.equal(t1, t2)
     return size1 == _.size(t2)
 end
 
-function _.findall(t,func)
-    _.asserttable(t)
-    _.assertfunction(func)
+function _.findallf(t, func)
     local ret = {}
     for k,v in pairs(t) do
-        if func(v) then
+        if func(k,v) then
             ret[k] = v
         end
     end
     return ret
 end
 
-function _.removeall(t,func)
-    _.asserttable(t)
-    _.assertfunction(func)
+function _.findallt(t, tbl)
+    local ret = {}
     for k,v in pairs(t) do
-        if func(v) then
+        if tbl[v] then
+            ret[k] = v
+        end
+    end
+    return ret
+end
+
+function _.findall(t,functbl)
+    _.asserttable(t)
+    local tp = _.ensurefunctionortable(functbl)
+    if tp == "function" then
+        return _.findallf(t, functbl)
+    else
+        return _.findallt(t, functbl)
+    end
+end
+
+function _.removeallf(t, func)
+    for k,v in pairs(t) do
+        if func(k,v) then
             t[k] = nil
         end
     end
     return t
+end
+
+function _.removeallt(t, tbl)
+    for k,v in pairs(t) do
+        if tbl[v] then
+            t[k] = nil
+        end
+    end
+    return t
+end
+
+function _.removeall(t,functbl)
+    _.asserttable(t)
+    local tp = _.ensurefunctionortable(functbl)
+    if tp == "function" then
+        return _.removeallf(t, functbl)
+    else
+        return _.removeallt(t, functbl)
+    end
 end
 
 function _.kvtoarray(t,sortfunc)
@@ -444,6 +517,22 @@ function _.flat(t)
     end
     flat(t)
     return ret
+end
+
+local pairsinorder = function(t, sortfunc)
+    local keys = _.unzip(t)
+    local keycount = #keys
+    table.sort(keys, sortfunc)
+    local pos = 1
+    while pos <= keycount do
+       local k = keys[pos]
+       coroutine.yield(k,t[k],pos)
+       pos = pos + 1
+    end
+end
+
+_.pairsinorder = function(t, sortfunc)
+    return coroutine.wrap(function() pairsinorder(t, sortfunc) end)
 end
 
 return {
@@ -477,5 +566,6 @@ return {
     findall = _.findall,
     removeall = _.removeall,
     kvtoarray = _.kvtoarray,
-    flat = _.flat
+    flat = _.flat,
+    pairsinorder = _.pairsinorder,
 }
